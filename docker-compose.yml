@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gmeet
+      POSTGRES_PASSWORD: gmeet
+      POSTGRES_DB: gmeet
+    ports:
+      - "5432:5432"
+    volumes:
+      - gmeet_pg:/var/lib/postgresql/data
+
+volumes:
+  gmeet_pg:
