@@ -28,6 +28,8 @@ export function StatusBar({
   health,
   languagePreference = "auto",
   detectedLanguage,
+  elevenLabsActive,
+  elevenLabsEnhancing,
   onLanguagePreference,
   onStatus,
 }: {
@@ -37,6 +39,8 @@ export function StatusBar({
   health: string
   languagePreference?: LanguagePreference
   detectedLanguage?: string | null
+  elevenLabsActive?: boolean
+  elevenLabsEnhancing?: boolean
   onLanguagePreference?: (language: LanguagePreference) => void
   onStatus?: (meeting: Pick<Meeting, "status" | "health">) => void
 }) {
@@ -123,6 +127,18 @@ export function StatusBar({
               ? "Connecting"
               : "Disconnected"}
       </span>
+      {elevenLabsActive ? (
+        <Badge variant="secondary" className="gap-1.5 text-[11px] font-normal">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              elevenLabsEnhancing
+                ? "bg-amber-500 animate-ping"
+                : "bg-emerald-500"
+            }`}
+          />
+          {elevenLabsEnhancing ? "ElevenLabs enhancing..." : "ElevenLabs Scribe"}
+        </Badge>
+      ) : null}
       <div className="ml-auto flex gap-2">
         {canResume ? (
           <Button

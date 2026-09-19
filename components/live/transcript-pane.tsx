@@ -66,7 +66,7 @@ export function TranscriptPane({
                 : "rounded-lg p-2"
             }
           >
-            <div className="flex gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <time className="font-mono">
                 {formatTimestamp(segment.startAt, origin)}
               </time>
@@ -75,6 +75,11 @@ export function TranscriptPane({
                   ? (names.get(segment.participantId) ?? speakerFallback)
                   : speakerFallback}
               </span>
+              {segment.modifiedAt ? (
+                <span className="inline-flex items-center rounded-sm bg-primary/10 px-1 py-0.5 text-[10px] font-medium text-primary">
+                  Enhanced
+                </span>
+              ) : null}
             </div>
             <p className="text-sm">{segment.text}</p>
           </li>

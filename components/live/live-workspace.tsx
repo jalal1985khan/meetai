@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/resizable"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useBrowserStt } from "@/hooks/use-browser-stt"
+import { useElevenLabsAudio } from "@/hooks/use-elevenlabs-audio"
 import {
   preferenceFromMeetingLanguage,
   type LanguagePreference,
@@ -142,6 +143,8 @@ export function LiveWorkspace({
   }, [highlightId])
 
   const sttActive = status === "live" || status === "degraded"
+  const [enhancedSegments, setEnhancedSegments] = useState<TranscriptSegment[]>([])
+
   const stt = useBrowserStt({
     meetingId: meeting.id,
     speakerLabel: speakerName || "You",
@@ -157,6 +160,25 @@ export function LiveWorkspace({
     },
   })
 
+  const elevenLabs = useElevenLabsAudio({
+    meetingId: meeting.id,
+    speakerLabel: speakerName || "You",
+    active: sttActive && stt.listening,
+    onSegmentEnhanced: (segment) => {
+      setEnhancedSegments((curr) => {
+        const filtered = curr.filter(
+          (s) => s.id !== segment.id && s.seq !== segment.seq
+        )
+        return [...filtered, segment]
+      })
+    },
+  })
+
+  const handleStartCapture = () => {
+    stt.start()
+    void elevenLabs.start()
+  }
+
   const segments = useMemo(() => {
     const byId = new Map<string, TranscriptSegment>()
     for (const segment of meeting.segments) {
@@ -165,8 +187,11 @@ export function LiveWorkspace({
     for (const segment of stt.segments) {
       byId.set(segment.id, segment)
     }
+    for (const segment of enhancedSegments) {
+      byId.set(segment.id, segment)
+    }
     return [...byId.values()].sort((a, b) => a.seq - b.seq)
-  }, [meeting.segments, stt.segments])
+  }, [meeting.segments, stt.segments, enhancedSegments])
 
   const participants = meeting.participants
 
@@ -184,13 +209,12 @@ export function LiveWorkspace({
           <Alert>
             <AlertTitle>Start live transcription</AlertTitle>
             <AlertDescription>
-              Click start and allow the microphone. Language is detected from
-              your speech. Other Meet participants are not captured until
-              tab-share is added. Audio is not stored.
+              Click start and allow the microphone. Browser STT provides instant
+              live text while ElevenLabs Scribe enhances accuracy in parallel.
             </AlertDescription>
           </Alert>
           <div className="pt-3">
-            <Button onClick={() => stt.start()} disabled={stt.unsupported}>
+            <Button onClick={handleStartCapture} disabled={stt.unsupported}>
               Start capturing audio
             </Button>
           </div>
@@ -270,6 +294,8 @@ export function LiveWorkspace({
         health={displayHealth}
         languagePreference={languagePreference}
         detectedLanguage={stt.resolvedLanguage}
+        elevenLabsActive={stt.listening}
+        elevenLabsEnhancing={elevenLabs.isEnhancing}
         onLanguagePreference={(next) => {
           setLanguagePreference(next)
           void fetch(`/api/meetings/${meeting.id}/language`, {
@@ -288,6 +314,7 @@ export function LiveWorkspace({
             next.status === "ready"
           ) {
             stt.stop()
+            elevenLabs.stop()
           }
           if (next.status === "ready") {
             router.refresh()

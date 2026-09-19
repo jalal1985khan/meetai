@@ -370,6 +370,96 @@ export async function appendFinalSegment(
   })
 }
 
+export async function saveEnhancedAudioSegment(
+  userId: string,
+  meetingId: string,
+  input: {
+    text: string
+    startAt: string
+    endAt: string
+    speakerLabel: string
+    language?: string | null
+  }
+) {
+  const meeting = await requireMeeting(userId, meetingId)
+  if (meeting.status !== "live" && meeting.status !== "degraded") {
+    throw new HttpError(409, "Transcript can only be appended while live.")
+  }
+
+  const startAt = new Date(input.startAt)
+  const endAt = new Date(input.endAt)
+  if (Number.isNaN(startAt.getTime()) || Number.isNaN(endAt.getTime())) {
+    throw new HttpError(400, "Invalid segment timestamps.")
+  }
+
+  return prisma.$transaction(async (tx) => {
+    let participant = await tx.participant.findFirst({
+      where: { meetingId, speakerLabel: input.speakerLabel },
+    })
+    if (!participant) {
+      participant = await tx.participant.create({
+        data: {
+          meetingId,
+          displayName: input.speakerLabel,
+          speakerLabel: input.speakerLabel,
+        },
+      })
+    }
+
+    // Check if there is an overlapping recent segment created in the last 20 seconds to enhance
+    const recent = await tx.transcriptSegment.findFirst({
+      where: {
+        meetingId,
+        startAt: { gte: new Date(startAt.getTime() - 8000) },
+      },
+      orderBy: { seq: "desc" },
+    })
+
+    if (recent) {
+      const updated = await tx.transcriptSegment.update({
+        where: { id: recent.id },
+        data: {
+          text: input.text,
+          modifiedAt: new Date(),
+          ...(input.language ? { language: input.language } : {}),
+        },
+      })
+      return updated
+    }
+
+    const last = await tx.transcriptSegment.findFirst({
+      where: { meetingId },
+      orderBy: { seq: "desc" },
+      select: { seq: true },
+    })
+
+    const segment = await tx.transcriptSegment.create({
+      data: {
+        meetingId,
+        participantId: participant.id,
+        seq: (last?.seq ?? 0) + 1,
+        text: input.text,
+        startAt,
+        endAt,
+        language: input.language ?? null,
+        isFinal: true,
+        source: "stt_stream",
+        modifiedAt: new Date(),
+      },
+    })
+
+    await tx.meeting.update({
+      where: { id: meetingId },
+      data: {
+        health: "connected",
+        ...(input.language ? { language: input.language } : {}),
+      },
+    })
+
+    return segment
+  })
+}
+
 export async function setMeetingHealth(
   userId: string,
   meetingId: string,
