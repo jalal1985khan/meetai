@@ -47,8 +47,9 @@ export default async function LandingPage({
           <Alert variant="destructive">
             <AlertTitle>Sign-in did not complete</AlertTitle>
             <AlertDescription>
-              Check Google OAuth credentials and try again. No local password is
-              created.
+              {params.error === "Configuration"
+                ? "Configuration error. Verify that AUTH_SECRET, Google OAuth Client ID/Secret, and DATABASE_URL are set correctly in your deployment environment."
+                : `Authentication error (${params.error}). Check Google OAuth credentials and try again.`}
             </AlertDescription>
           </Alert>
         ) : null}
